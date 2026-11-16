@@ -1,2 +1,0 @@
-[tool.vercel.functions]
-"api/gemini.py" = { maxDuration = 30 }
