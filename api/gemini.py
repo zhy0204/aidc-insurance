@@ -14,7 +14,7 @@ if GEMINI_API_KEY:
 
 @app.route('/')
 def home():
-    html_path = os.path.join(os.path.dirname(__file__), '..', 'index.html')
+    html_path = os.path.join(os.path.dirname(__file__), 'index.html')
     return send_file(html_path)
 
 @app.route('/api/gemini', methods=['POST'])
