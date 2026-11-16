@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import os
 import base64
@@ -11,6 +11,11 @@ CORS(app)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+
+@app.route('/')
+def home():
+    html_path = os.path.join(os.path.dirname(__file__), '..', 'index.html')
+    return send_file(html_path)
 
 @app.route('/api/gemini', methods=['POST'])
 def gemini_proxy():
