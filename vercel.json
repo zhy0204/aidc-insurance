@@ -4,7 +4,7 @@
     { "src": "api/gemini.py", "use": "@vercel/python" }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "api/gemini.py" },
+    { "src": "/api/(.*)", "dest": "/api/gemini.py" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
