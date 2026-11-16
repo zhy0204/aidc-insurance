@@ -1,2 +1,2 @@
-[tool.vercel]
-entrypoint = "api.gemini:app"
+[tool.vercel.functions]
+"api/gemini.py" = { maxDuration = 30 }
