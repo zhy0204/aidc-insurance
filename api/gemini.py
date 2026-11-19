@@ -14,13 +14,30 @@ if GEMINI_API_KEY:
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# 免費額度按「個別模型」獨立計算，主模型達 20 次上限時自動依序切換備援模型
-FALLBACK_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-3.0-flash",
-    "gemini-2.0-flash",
-]
+
+def get_available_models():
+    """動態取得目前 API Key 可用的所有現役模型，優先嘗試輕量/備援模型以避開已滿額度"""
+    preferred = [
+        "gemini-2.5-flash-lite",
+        "gemini-3.8-flash-lite",
+        "gemini-2.5-pro",
+        "gemini-3.8-pro",
+        "gemini-3.8-flash",
+    ]
+    available = []
+    try:
+        for m in genai.list_models():
+            if "generateContent" in getattr(m, "supported_generation_methods", []):
+                name = m.name.replace("models/", "")
+                available.append(name)
+    except Exception:
+        pass
+
+    ordered = [m for m in preferred if m in available]
+    for m in available:
+        if m not in ordered and "embedding" not in m and "imagen" not in m:
+            ordered.append(m)
+    return ordered or preferred
 
 
 @app.route("/", methods=["GET"])
@@ -86,7 +103,7 @@ def gemini_proxy(subpath=None):
         response = None
         last_error = None
 
-        for model_name in FALLBACK_MODELS:
+        for model_name in get_available_models():
             try:
                 model = genai.GenerativeModel(
                     model_name,
@@ -97,13 +114,12 @@ def gemini_proxy(subpath=None):
             except Exception as model_err:
                 last_error = model_err
                 err_msg = str(model_err)
-                # 遇到 429 額度滿或 404 模型不支援時，自動跳下一個備援模型
-                if "429" in err_msg or "404" in err_msg or "quota" in err_msg.lower():
+                if "429" in err_msg or "404" in err_msg or "quota" in err_msg.lower() or "not found" in err_msg.lower():
                     continue
                 raise model_err
 
         if response is None:
-            raise last_error or RuntimeError("所有備援模型目前皆無法使用")
+            raise last_error or RuntimeError("目前所有可用模型皆已達今日上限")
 
         result_text = response.text or ""
 
