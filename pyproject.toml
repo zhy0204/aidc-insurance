@@ -1,11 +1,9 @@
 [project]
 name = "aidc-insurance"
 version = "0.1.0"
+requires-python = ">=3.9"
 dependencies = [
     "flask",
     "flask-cors",
     "google-generativeai",
 ]
-
-[tool.vercel]
-entrypoint = "api.gemini:app"
