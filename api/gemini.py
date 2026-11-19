@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def get_available_models():
-    """動態取得目前 API Key 可用的所有現役模型，優先嘗試輕量/備援模型以避開已滿額度"""
+    """動態取得目前 API Key 可用的現役模型，排除 TTS、語音、影像生成等不支援一般多模態判讀的模型"""
     preferred = [
         "gemini-2.5-flash-lite",
         "gemini-3.8-flash-lite",
@@ -24,18 +24,21 @@ def get_available_models():
         "gemini-3.8-pro",
         "gemini-3.8-flash",
     ]
+    excluded_keywords = ("tts", "audio", "live", "imagen", "veo", "embedding", "aqa")
     available = []
     try:
         for m in genai.list_models():
             if "generateContent" in getattr(m, "supported_generation_methods", []):
                 name = m.name.replace("models/", "")
+                if any(kw in name.lower() for kw in excluded_keywords):
+                    continue
                 available.append(name)
     except Exception:
         pass
 
     ordered = [m for m in preferred if m in available]
     for m in available:
-        if m not in ordered and "embedding" not in m and "imagen" not in m:
+        if m not in ordered:
             ordered.append(m)
     return ordered or preferred
 
@@ -114,7 +117,7 @@ def gemini_proxy(subpath=None):
             except Exception as model_err:
                 last_error = model_err
                 err_msg = str(model_err)
-                if "429" in err_msg or "404" in err_msg or "quota" in err_msg.lower() or "not found" in err_msg.lower():
+                if "429" in err_msg or "404" in err_msg or "400" in err_msg or "quota" in err_msg.lower() or "not found" in err_msg.lower():
                     continue
                 raise model_err
 
