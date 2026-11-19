@@ -14,6 +14,14 @@ if GEMINI_API_KEY:
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# 免費額度按「個別模型」獨立計算，主模型達 20 次上限時自動依序切換備援模型
+FALLBACK_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-3.0-flash",
+    "gemini-2.0-flash",
+]
+
 
 @app.route("/", methods=["GET"])
 def serve_index():
@@ -23,7 +31,6 @@ def serve_index():
     return "找不到 index.html", 404
 
 
-# 同時接住所有可能的 /api/... 路徑，避免前端網址對不上而回傳 404 HTML
 @app.route("/api/gemini", methods=["POST", "OPTIONS"])
 @app.route("/api/<path:subpath>", methods=["POST", "OPTIONS"])
 def gemini_proxy(subpath=None):
@@ -39,12 +46,10 @@ def gemini_proxy(subpath=None):
     try:
         data = request.get_json(silent=True) or {}
 
-        # 自動相容不同前端欄位名稱：prompt / text / query / contents
         prompt = data.get("prompt") or data.get("text") or data.get("query") or ""
         images = data.get("images") or []
         json_mode = bool(data.get("json_mode") or data.get("jsonMode"))
 
-        # 若前端直接傳送 Gemini 原生格式的 contents
         raw_contents = data.get("contents")
         contents = []
 
@@ -78,15 +83,30 @@ def gemini_proxy(subpath=None):
         if json_mode:
             generation_config["response_mime_type"] = "application/json"
 
-        model = genai.GenerativeModel(
-            "gemini-3.8-flash",
-            generation_config=generation_config
-        )
+        response = None
+        last_error = None
 
-        response = model.generate_content(contents)
+        for model_name in FALLBACK_MODELS:
+            try:
+                model = genai.GenerativeModel(
+                    model_name,
+                    generation_config=generation_config
+                )
+                response = model.generate_content(contents)
+                break
+            except Exception as model_err:
+                last_error = model_err
+                err_msg = str(model_err)
+                # 遇到 429 額度滿或 404 模型不支援時，自動跳下一個備援模型
+                if "429" in err_msg or "404" in err_msg or "quota" in err_msg.lower():
+                    continue
+                raise model_err
+
+        if response is None:
+            raise last_error or RuntimeError("所有備援模型目前皆無法使用")
+
         result_text = response.text or ""
 
-        # 同時回傳 text 與 Gemini 原生 candidates 結構，確保前端無論讀哪個欄位都拿得到結果
         payload = {
             "success": True,
             "text": result_text,
