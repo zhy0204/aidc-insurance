@@ -7,3 +7,6 @@ dependencies = [
     "flask-cors",
     "google-generativeai",
 ]
+
+[tool.vercel]
+entrypoint = "api.gemini:app"
